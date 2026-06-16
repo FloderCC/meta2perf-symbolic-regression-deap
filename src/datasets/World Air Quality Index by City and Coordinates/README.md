@@ -1,2 +1,0 @@
-https://www.kaggle.com/datasets/adityaramachandran27/world-air-quality-index-by-city-and-coordinates
-class: AQI Category

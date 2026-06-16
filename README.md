@@ -1,96 +1,121 @@
 # meta2perf-symbolic-regression-deap
 
-Code and experiment artifacts for the paper **“Balancing Accuracy and Interpretability in Symbolic Modeling of Machine Learning Performance.”** This repository implements a two-stage symbolic regression workflow for predicting the performance of machine learning classifiers from dataset meta-features and model descriptors. The target variable is the **Matthews Correlation Coefficient (MCC)** of the best tuned configuration for each learning algorithm. The paper studies how a strong first-stage symbolic predictor can be refined into a more interpretable second-stage equation while preserving useful predictive accuracy.
+This repository contains the code, data, and experiment artifacts for a DEAP-based genetic programming pipeline that learns closed-form symbolic regression models for estimating machine-learning classification performance.
 
-The repository reuses a previously constructed meta-dataset with **25,836 meta-instances**, derived from **65 classification datasets**, **5 sampling ratios** (20%, 40%, 60%, 80%, and 100%), **16 machine learning algorithms**, and **5 random seeds**. Each meta-instance represents one `(seed, dataset variant, algorithm)` experiment and combines dataset meta-features with model descriptors. The current study focuses on **MCC > 0** instances, matching the evaluation protocol described in the paper.
+The prediction target is the Matthews Correlation Coefficient (MCC). Each meta-instance combines dataset meta-features, model descriptors, and the MCC obtained by a machine-learning algorithm on a sampled version of a classification dataset.
 
-## Repository overview
+## Repository Contents
 
 ```text
 .
 ├── README.md
 └── src/
-    ├── __init__.py
-    ├── datasets/                    # per-dataset notes/READMEs
-    ├── docs/                        # paper-aligned appendices and reference material
-    │   ├── datasets.md
-    │   ├── ml-hyperparams.md
-    │   └── model-descriptors.md
-    ├── logs/
-    │   └── exp_stage_perf.txt       # execution log for the stage-1 search
+    ├── exp_perf_beam_grid_search.py
+    ├── exp_perf_beam_grid_search_top10.py
+    ├── exp_perf_beam_grid_search_top10_s1.py
+    ├── exp_perf_beam_grid_search_top10_s2.py
+    ├── exp_perf_beam_grid_search_top10_s3.py
+    ├── plot_reg_model.py
+    ├── meta_dataset/
+    │   └── data.csv
     ├── plots/
-    │   ├── pred_vs_true_stage1.pdf
-    │   └── pred_vs_true_stage2.pdf
+    │   └── pred_vs_true.pdf
     ├── results/
-    │   ├── exp_stage_sim_hall_of_fame.csv
-    │   └── meta_dataset.csv
-    ├── results_analysis/
-    │   ├── __init__.py
-    │   ├── reg_model_perf.py
-    │   ├── reg_model_simp.py
-    │   └── reg_model_simp_fact.py
-    ├── utils/
-    │   ├── __init__.py
-    │   └── ga_init_ext.py
-    ├── exp_stage_perf.py            # stage 1: accuracy-oriented DEAP + OBLESA search
-    └── exp_stage_simp.py            # stage 2: penalized refinement for interpretability
+    │   ├── beam_grid_hyperparameter_search_summary.csv
+    │   ├── beam_grid_refinement_top10_summary.csv
+    │   ├── exp_perf_beam_grid_search_top10_s1/
+    │   │   └── summary.csv
+    │   ├── exp_perf_beam_grid_search_top10_s2/
+    │   │   └── summary.csv
+    │   └── exp_perf_beam_grid_search_top10_s3/
+    │       └── summary.csv
+    └── utils/
+        ├── ga_initialization.py
+        └── gp_custom_operators.py
 ```
 
-## What this repository contains
+## Data
 
-### 1. Stage 1: performance-oriented symbolic regression
+The file `src/meta_dataset/data.csv` contains 25,836 meta-instances and 24 columns. The descriptive columns are:
 
-`src/exp_stage_perf.py` runs the first symbolic regression stage in DEAP
+- `Seed`
+- `Dataset`
+- `Sample Size`
+- `Model`
 
-Outputs produced by this stage include:
+The remaining columns contain dataset meta-features, model descriptors, and the target variable `MCC`.
 
-- `src/logs/exp_stage_perf.txt`
-- `src/plots/pred_vs_true_stage1.pdf`
-- the best evolved symbolic expression printed in the log
+## Experiment Workflow
 
-### 2. Stage 2: penalized refinement for a more interpretable model
+The repository implements a three-step search and evaluation workflow.
 
-`src/exp_stage_simp.py` implements the second stage described in the paper. It reuses the same meta-dataset and core GP machinery, but adds a penalized objective intended to improve the accuracy–interpretability balance of the final expression.
+### 1. Beam-Guided Hyperparameter Search
 
+`src/exp_perf_beam_grid_search.py` performs the first screening stage. It evaluates a budget-limited sequence of configurations from a predefined grid using a beam-guided search strategy.
+
+Main settings:
+
+- Maximum tree size: 400 nodes
+- Maximum tree height: 30
+- Initialization method: OBLESA
+- Screening budget: 100 GP generations per configuration
+- Maximum evaluated configurations: 300
+- Base random seed: 42
 
 Main output:
 
-- `src/results/exp_stage_sim_hall_of_fame.csv`
-- `src/plots/pred_vs_true_stage2.pdf`
+- `src/results/beam_grid_hyperparameter_search_summary.csv`
 
-### 3. Analysis scripts for the selected equations
+### 2. Top-10 Refinement
 
-The `src/results_analysis/` folder contains analysis and plotting scripts for the selected symbolic predictors:
+`src/exp_perf_beam_grid_search_top10.py` reads the first-stage summary, selects the top 10 configurations, and reruns them with a larger budget.
 
-- `reg_model_perf.py` analyzes and plots the stage-1 predictor.
-- `reg_model_simp.py` analyzes and plots the stage-2 balanced predictor.
-- `reg_model_simp_fact.py` contains a factored/block-style version of the simplified predictor.
+Main settings:
 
-### 4. OBLESA-based initialization utilities
+- Refinement budget: 500 GP generations per selected configuration
+- Number of selected configurations: 10
+- Checkpoint resume enabled
 
-`src/utils/ga_init_ext.py` contains the external population-initialization logic used by the DEAP runs. In the methodology of the paper, this component is responsible for generating a stronger initial population through the OBLESA procedure before the GP evolution begins.
+Main output:
 
-## Running the code
+- `src/results/beam_grid_refinement_top10_summary.csv`
 
-The experiment scripts use paths such as `./results/meta_dataset.csv` and `logs/exp_stage_perf.txt`, so they are intended to be executed **from inside the `src/` directory**.
+### 3. Independent Final Runs
 
-Typical workflow:
+The scripts below run manually selected configurations for 5,000 GP generations:
+
+- `src/exp_perf_beam_grid_search_top10_s1.py`
+- `src/exp_perf_beam_grid_search_top10_s2.py`
+- `src/exp_perf_beam_grid_search_top10_s3.py`
+
+Their summaries are stored in:
+
+- `src/results/exp_perf_beam_grid_search_top10_s1/summary.csv`
+- `src/results/exp_perf_beam_grid_search_top10_s2/summary.csv`
+- `src/results/exp_perf_beam_grid_search_top10_s3/summary.csv`
+
+In the included results, configuration `s2` obtained the highest test `R^2` among the three independent final runs.
+
+## Plotting the Selected Model
+
+`src/plot_reg_model.py` evaluates the selected symbolic expression and generates a predicted-versus-true MCC plot.
+
+Output:
+
+- `src/plots/pred_vs_true.pdf`
+
+## Running the Code
+
+The scripts use paths relative to `src/`, so run them from inside that directory:
 
 ```bash
 cd src
-python exp_stage_perf.py
-python exp_stage_simp.py
-python results_analysis/reg_model_perf.py
-python results_analysis/reg_model_simp.py
+python exp_perf_beam_grid_search.py
+python exp_perf_beam_grid_search_top10.py
+python exp_perf_beam_grid_search_top10_s1.py
+python exp_perf_beam_grid_search_top10_s2.py
+python exp_perf_beam_grid_search_top10_s3.py
+python plot_reg_model.py
 ```
 
-## Python dependencies
-
-A `requirements.txt` file is not included in the attached source archive, but the checked-in scripts clearly depend on at least the following Python packages:
-
-- `numpy`
-- `pandas`
-- `scikit-learn`
-- `matplotlib`
-- `deap`
-- `tqdm`
+Optional generated folders such as `cache/`, `checkpoints/`, and `logs/` may be created when the GP scripts are executed.

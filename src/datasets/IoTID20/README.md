@@ -1,1 +1,0 @@
-https://sites.google.com/view/iot-network-intrusion-dataset/home

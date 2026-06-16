@@ -1,1 +1,0 @@
-https://www.kaggle.com/datasets/mkhubaiib/iot-attack-prediction-dataset

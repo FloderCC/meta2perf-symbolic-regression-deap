@@ -1,2 +1,0 @@
-https://www.kaggle.com/datasets/uciml/iris
-class: Species
