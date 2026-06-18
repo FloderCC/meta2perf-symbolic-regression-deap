@@ -1,4 +1,4 @@
-# meta2perf-symbolic-regression-deap
+# meta2perf-sr-deap
 
 This repository contains the code, data, and experiment artifacts for a DEAP-based genetic programming pipeline that learns closed-form symbolic regression models for estimating machine-learning classification performance.
 
